@@ -10,6 +10,10 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 导入
+
+const STORAGE_KEY = 'savedBtcAddress';
+
 export default function App() {
   const [btcAddress, setBtcAddress] = useState('');
   const [confirmedAddress, setConfirmedAddress] = useState<string | null>(null);
@@ -17,6 +21,22 @@ export default function App() {
   const dataRef = useRef<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 启动时读取本地存储
+  useEffect(() => {
+    const loadAddress = async () => {
+      try {
+        const savedAddress = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedAddress) {
+          setConfirmedAddress(savedAddress);
+          setBtcAddress(savedAddress);
+        }
+      } catch (e) {
+        console.warn('读取本地地址失败', e);
+      }
+    };
+    loadAddress();
+  }, []);
 
   const fetchData = async (address: string) => {
     setLoading(true);
@@ -47,6 +67,36 @@ export default function App() {
     return () => clearInterval(interval);
   }, [confirmedAddress]);
 
+  // 确认地址按钮，保存到 AsyncStorage
+  const onConfirmAddress = async () => {
+    if (btcAddress.trim()) {
+      const addr = btcAddress.trim();
+      setConfirmedAddress(addr);
+      setError('');
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, addr);
+      } catch (e) {
+        console.warn('保存地址失败', e);
+      }
+    } else {
+      setError('请输入有效的比特币地址');
+    }
+  };
+
+  // 修改地址，清除本地存储
+  const onModifyAddress = async () => {
+    setConfirmedAddress(null);
+    setData(null);
+    setError('');
+    setBtcAddress('');
+    dataRef.current = null;
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.warn('清除本地地址失败', e);
+    }
+  };
+
   const worker = data?.worker?.[0];
 
   const tsToTime = (ts: number) =>
@@ -76,17 +126,7 @@ export default function App() {
               clearButtonMode="while-editing"
             />
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => {
-                if (btcAddress.trim()) {
-                  setConfirmedAddress(btcAddress.trim());
-                  setError('');
-                } else {
-                  setError('请输入有效的比特币地址');
-                }
-              }}
-            >
+            <TouchableOpacity style={styles.button} onPress={onConfirmAddress}>
               <Text style={styles.buttonText}>查询</Text>
             </TouchableOpacity>
 
@@ -96,13 +136,7 @@ export default function App() {
           <>
             <TouchableOpacity
               style={[styles.button, { backgroundColor: '#888', marginBottom: 20 }]}
-              onPress={() => {
-                setConfirmedAddress(null);
-                setData(null);
-                setError('');
-                setBtcAddress('');
-                dataRef.current = null;
-              }}
+              onPress={onModifyAddress}
             >
               <Text style={styles.buttonText}>修改地址</Text>
             </TouchableOpacity>
@@ -267,3 +301,4 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
 });
+
