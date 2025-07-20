@@ -134,13 +134,6 @@ export default function App() {
           </>
         ) : (
           <>
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#888', marginBottom: 20 }]}
-              onPress={onModifyAddress}
-            >
-              <Text style={styles.buttonText}>修改地址</Text>
-            </TouchableOpacity>
-
             {worker ? (
               <>
                 {/* 地址 */}
@@ -181,6 +174,14 @@ export default function App() {
                   <Text style={styles.label}>🕓 启动时间</Text>
                   <Text style={styles.time}>{tsToTime(data.authorised)}</Text>
                 </View>
+
+                <TouchableOpacity
+                  style={[styles.button, { backgroundColor: '#888', marginBottom: 20 }]}
+                  onPress={onModifyAddress}
+                >
+                  <Text style={styles.buttonText}>修改地址</Text>
+                </TouchableOpacity>
+
               </>
             ) : (
               !loading && <Text style={styles.noData}>暂无数据，请输入正确地址</Text>
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     paddingTop: 50,
-    backgroundColor: '#f0f0f5',
+    backgroundColor:'#e8ecf4',
     flex: 1,
   },
   title: {
