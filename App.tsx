@@ -8,9 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-
-import AsyncStorage from '@react-native-async-storage/async-storage'; // 导入
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'savedBtcAddress';
 
@@ -20,9 +20,7 @@ export default function App() {
   const [data, setData] = useState<any>(null);
   const dataRef = useRef<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  // 启动时读取本地存储
   useEffect(() => {
     const loadAddress = async () => {
       try {
@@ -39,55 +37,59 @@ export default function App() {
   }, []);
 
   const fetchData = async (address: string) => {
-    setLoading(true);
-    setError('');
-    try {
-      const API_URL = `https://solo.ckpool.org/users/${address}`;
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-      const json = await res.json();
+  setLoading(true);
+  try {
+    const API_URL = `https://solo.ckpool.org/users/${address}`;
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+    const json = await res.json();
 
-      if (JSON.stringify(json) !== JSON.stringify(dataRef.current)) {
-        setData(json);
-        dataRef.current = json;
-      }
-    } catch (err: any) {
-      setError('数据获取失败，请确认地址是否正确');
+    if (!json.worker || json.worker.length === 0) {
+      setConfirmedAddress(null);
       setData(null);
       dataRef.current = null;
-      console.error('数据获取失败', err);
+      Alert.alert('提示', '该地址无效，请重新输入');
+      return;
     }
-    setLoading(false);
+
+    if (JSON.stringify(json) !== JSON.stringify(dataRef.current)) {
+      setData(json);
+      dataRef.current = json;
+    }
+  } catch (err) {
+    setConfirmedAddress(null);
+    setData(null);
+    dataRef.current = null;
+    Alert.alert('错误', '数据获取失败，请检查网络或地址是否正确');
+    console.error('数据获取失败', err);
+  }
+  setLoading(false);
   };
 
   useEffect(() => {
     if (!confirmedAddress) return;
     fetchData(confirmedAddress);
-    const interval = setInterval(() => fetchData(confirmedAddress), 5000);
+    const interval = setInterval(() => fetchData(confirmedAddress), 10000);
     return () => clearInterval(interval);
   }, [confirmedAddress]);
 
-  // 确认地址按钮，保存到 AsyncStorage
   const onConfirmAddress = async () => {
-    if (btcAddress.trim()) {
-      const addr = btcAddress.trim();
+    const addr = btcAddress.trim();
+    if (addr) {
       setConfirmedAddress(addr);
-      setError('');
       try {
         await AsyncStorage.setItem(STORAGE_KEY, addr);
       } catch (e) {
         console.warn('保存地址失败', e);
       }
     } else {
-      setError('请输入有效的比特币地址');
+      Alert.alert('提示', '请输入有效的比特币地址');
     }
   };
 
-  // 修改地址，清除本地存储
   const onModifyAddress = async () => {
     setConfirmedAddress(null);
     setData(null);
-    setError('');
     setBtcAddress('');
     dataRef.current = null;
     try {
@@ -129,64 +131,53 @@ export default function App() {
             <TouchableOpacity style={styles.button} onPress={onConfirmAddress}>
               <Text style={styles.buttonText}>查询</Text>
             </TouchableOpacity>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
           </>
         ) : (
-          <>
-            {worker ? (
-              <>
-                {/* 地址 */}
-                <View style={styles.card}>
-                  <Text style={styles.label}>🔧 地址</Text>
-                  <Text selectable style={[styles.address]}>
-                    {worker.workername}
-                  </Text>
-                </View>
+          worker && (
+            <>
+              <View style={styles.card}>
+                <Text style={styles.label}>🔧 地址</Text>
+                <Text selectable style={styles.address}>
+                  {worker.workername}
+                </Text>
+              </View>
 
-                {/* 算力 */}
-                <View style={styles.card}>
-                  <Text style={styles.label}>📊 实时算力</Text>
-                  <View style={styles.hashrateRow}>
-                    <View style={styles.hashrateItem}>
-                      <Text style={styles.hashrateLabel}>1m</Text>
-                      <Text style={styles.hashrateValue}>{worker.hashrate1m}</Text>
-                    </View>
-                    <View style={styles.hashrateItem}>
-                      <Text style={styles.hashrateLabel}>5m</Text>
-                      <Text style={styles.hashrateValue}>{worker.hashrate5m}</Text>
-                    </View>
-                    <View style={styles.hashrateItem}>
-                      <Text style={styles.hashrateLabel}>1h</Text>
-                      <Text style={styles.hashrateValue}>{worker.hashrate1hr}</Text>
-                    </View>
+              <View style={styles.card}>
+                <Text style={styles.label}>📊 实时算力</Text>
+                <View style={styles.hashrateRow}>
+                  <View style={styles.hashrateItem}>
+                    <Text style={styles.hashrateLabel}>1m</Text>
+                    <Text style={styles.hashrateValue}>{worker.hashrate1m}</Text>
+                  </View>
+                  <View style={styles.hashrateItem}>
+                    <Text style={styles.hashrateLabel}>5m</Text>
+                    <Text style={styles.hashrateValue}>{worker.hashrate5m}</Text>
+                  </View>
+                  <View style={styles.hashrateItem}>
+                    <Text style={styles.hashrateLabel}>1h</Text>
+                    <Text style={styles.hashrateValue}>{worker.hashrate1hr}</Text>
                   </View>
                 </View>
+              </View>
 
-                {/* 时间 */}
-                <View style={styles.card}>
-                  <Text style={styles.label}>⏱ 最后提交</Text>
-                  <Text style={styles.time}>{tsToTime(worker.lastshare)}</Text>
-                </View>
+              <View style={styles.card}>
+                <Text style={styles.label}>⏱ 最后提交</Text>
+                <Text style={styles.time}>{tsToTime(worker.lastshare)}</Text>
+              </View>
 
-                {/* 启动时间 */}
-                <View style={styles.card}>
-                  <Text style={styles.label}>🕓 启动时间</Text>
-                  <Text style={styles.time}>{tsToTime(data.authorised)}</Text>
-                </View>
+              <View style={styles.card}>
+                <Text style={styles.label}>🕓 启动时间</Text>
+                <Text style={styles.time}>{tsToTime(data.authorised)}</Text>
+              </View>
 
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: '#888', marginBottom: 20 }]}
-                  onPress={onModifyAddress}
-                >
-                  <Text style={styles.buttonText}>修改地址</Text>
-                </TouchableOpacity>
-
-              </>
-            ) : (
-              !loading && <Text style={styles.noData}>暂无数据，请输入正确地址</Text>
-            )}
-          </>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: '#888', marginBottom: 20 }]}
+                onPress={onModifyAddress}
+              >
+                <Text style={styles.buttonText}>修改地址</Text>
+              </TouchableOpacity>
+            </>
+          )
         )}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -197,7 +188,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     paddingTop: 50,
-    backgroundColor:'#e8ecf4',
+    backgroundColor: '#e8ecf4',
     flex: 1,
   },
   title: {
@@ -229,12 +220,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '700',
     fontSize: 18,
-  },
-  error: {
-    color: '#d9534f',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
   },
   card: {
     backgroundColor: '#fff',
@@ -295,11 +280,4 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '600',
   },
-  noData: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 50,
-  },
 });
-
